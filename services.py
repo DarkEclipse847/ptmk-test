@@ -1,7 +1,8 @@
 from typing import Optional
 import datetime
 from sqlalchemy.orm import Session
-from sqlalchemy import select
+from sqlalchemy.orm import joinedload
+from sqlalchemy import select, func
 from models import Request, Employee
 
 class RequestDomainService:
@@ -66,4 +67,55 @@ class RequestDomainService:
         if is_overdue:
             query = query.where(Request.deadline < datetime.datetime.utcnow()).where(Request.status != "Выполнена")
         query = query.offset(offset).limit(limit)
+        return self.db.scalars(query).all()
+    def generate_analytical_report(self) -> dict:
+        status_query = (
+            select(Request.status, func.count(Request.id).label("count"))
+            .group_by(Request.status)
+        )
+        status_results = self.db.execute(status_query).all()
+        by_status = [{"status": r.status, "count": r.count} for r in status_results]
+        overdue_query = (
+            select(func.count(Request.id))
+            .where(Request.deadline < func.now())
+            .where(Request.status != "Выполнена")
+        )
+        total_overdue = self.db.scalar(overdue_query) or 0
+        executor_query = (
+            select(
+                Request.executor_id,
+                Employee.full_name.label("executor_name"),
+                func.count(Request.id).label("completed_count")
+            )
+            .join(Employee, Request.executor_id == Employee.id, isouter=True)
+            .where(Request.status == "Выполнена")
+            .group_by(Request.executor_id, Employee.full_name)
+            .order_by(func.count(Request.id).desc())
+            .limit(100)
+        )
+        executor_results = self.db.execute(executor_query).all()
+        by_executor = [
+            {
+                "executor_id": r.executor_id,
+                "executor_name": r.executor_name if r.executor_id else "Не назначен",
+                "completed_count": r.completed_count
+            }
+            for r in executor_results
+        ]
+        return {
+            "by_status": by_status,
+            "total_overdue": total_overdue,
+            "by_executor": by_executor
+        }
+    def get_employees(self, limit: int = 100, offset: int = 0):
+        query = (
+            select(Employee)
+            .options(
+                joinedload(Employee.department),
+                joinedload(Employee.position)
+            )
+            .order_by(Employee.id)
+            .offset(offset)
+            .limit(limit)
+        )
         return self.db.scalars(query).all()

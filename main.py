@@ -51,3 +51,17 @@ def list_requests(
         limit=limit,
         offset=offset
     )
+
+@app.get("/requests/report", response_model=schemas.AnalyticalReportResponse, tags=["Отчетность"])
+def get_analytical_report(db: Session = Depends(get_db)):
+    service = RequestDomainService(db)
+    return service.generate_analytical_report()
+
+@app.get("/employees/", response_model=list[schemas.EmployeeDetailedResponse], tags=["Сотрудники"])
+def list_employees(
+    limit: int = Query(50, ge=1, le=100, description="Количество сотрудников на страницу"),
+    offset: int = Query(0, ge=0, description="Смещение (пропустить N строк)"),
+    db: Session = Depends(get_db)
+):
+    service = RequestDomainService(db)
+    return service.get_employees(limit=limit, offset=offset)

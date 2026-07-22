@@ -26,3 +26,30 @@ class RequestResponse(BaseModel):
     deadline: datetime.datetime
     status: str
     model_config = ConfigDict(from_attributes=True)
+
+class StatusCount(BaseModel):
+    status: str
+    count: int
+
+class ExecutorPerformance(BaseModel):
+    executor_id: Optional[int]
+    executor_name: Optional[str]
+    completed_count: int
+
+class AnalyticalReportResponse(BaseModel):
+    by_status: list[StatusCount]
+    total_overdue: int
+    by_executor: list[ExecutorPerformance]
+
+class NamedEntity(BaseModel):
+    id: int
+    name: str
+    model_config = ConfigDict(from_attributes=True)
+
+class EmployeeDetailedResponse(BaseModel):
+    id: int
+    full_name: str
+    department: NamedEntity
+    position: NamedEntity
+    
+    model_config = ConfigDict(from_attributes=True)
